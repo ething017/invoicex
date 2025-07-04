@@ -17,7 +17,7 @@
                 <h5 class="mb-0">بيانات الموزع</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/distributors/${distributor._id}?_method=PUT">
+                <form method="POST" action="/distributors/${distributor._id}?_method=PUT" id="distributorEditForm">
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="username" class="form-label">اسم المستخدم <span class="text-danger">*</span></label>
@@ -65,8 +65,8 @@
                                             <th class="text-center action-header">حذف</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        ${generatePermissionRows()}
+                                    <tbody id="permissionsTableBody">
+                                        <!-- Permissions will be loaded here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -296,7 +296,7 @@ function applyDefaultPermissions() {
     // Clear all checkboxes first
     clearAllPermissions();
     
-    // Apply permissions based on the image:
+    // Apply permissions based on the default configuration:
     // الشركات: عرض الخاصة + عرض الكل
     setModulePermissions('suppliers', ['view_own', 'view_all']);
     
@@ -343,6 +343,9 @@ function showNotification(message, type = 'info') {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Generate permission rows
+    document.getElementById('permissionsTableBody').innerHTML = generatePermissionRows();
+    
     // Add change listeners to checkboxes for visual feedback
     document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
@@ -355,16 +358,24 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-});
-
-// Form validation
-document.querySelector('form').addEventListener('submit', function(e) {
-    const checkedPermissions = document.querySelectorAll('.permission-checkbox:checked');
-    if (checkedPermissions.length === 0) {
-        e.preventDefault();
-        showNotification('يجب تحديد صلاحية واحدة على الأقل', 'warning');
-        return false;
-    }
+    
+    // Form validation
+    document.getElementById('distributorEditForm').addEventListener('submit', function(e) {
+        const checkedPermissions = document.querySelectorAll('.permission-checkbox:checked');
+        if (checkedPermissions.length === 0) {
+            e.preventDefault();
+            showNotification('يجب تحديد صلاحية واحدة على الأقل', 'warning');
+            return false;
+        }
+        
+        const username = document.getElementById('username').value.trim();
+        
+        if (!username) {
+            e.preventDefault();
+            showNotification('اسم المستخدم مطلوب', 'warning');
+            return false;
+        }
+    });
 });
 </script>
 ` }) %>

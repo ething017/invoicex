@@ -17,16 +17,18 @@
                 <h5 class="mb-0">بيانات الموزع</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/distributors">
+                <form method="POST" action="/distributors" id="distributorForm">
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="username" class="form-label">اسم المستخدم <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="username" name="username" required>
+                            <div class="form-text">يجب أن يكون فريداً في النظام</div>
                         </div>
                         
                         <div class="col-md-4 mb-3">
                             <label for="password" class="form-label">كلمة المرور <span class="text-danger">*</span></label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                            <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                            <div class="form-text">يجب أن تكون 6 أحرف على الأقل</div>
                         </div>
                         
                         <div class="col-md-4 mb-3">
@@ -41,9 +43,13 @@
                         <div class="permissions-table-container">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">تحديد الصلاحيات</h6>
-                                <button type="button" class="btn btn-primary btn-sm" id="updateDefaultPermissions">
-                                    تحديث الصلاحيات
-                                </button>
+                                <div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="selectAllPermissions()">تحديد الكل</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="clearAllPermissions()">إلغاء الكل</button>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="applyDefaultPermissions()">
+                                        تطبيق الافتراضي
+                                    </button>
+                                </div>
                             </div>
                             
                             <div class="table-responsive">
@@ -58,8 +64,8 @@
                                             <th class="text-center action-header">حذف</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        ${generatePermissionRows()}
+                                    <tbody id="permissionsTableBody">
+                                        <!-- Permissions will be loaded here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -271,37 +277,25 @@ function generatePermissionRows() {
     return rows;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Apply default permissions based on the image requirements
-    applyDefaultPermissions();
-    
-    // Add event listener for update button
-    document.getElementById('updateDefaultPermissions').addEventListener('click', function() {
-        applyDefaultPermissions();
-        showNotification('تم تحديث الصلاحيات الافتراضية بنجاح', 'success');
-    });
-    
-    // Add change listeners to checkboxes for visual feedback
+function selectAllPermissions() {
     document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const row = this.closest('tr');
-            if (this.checked) {
-                row.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
-                setTimeout(() => {
-                    row.style.backgroundColor = '';
-                }, 500);
-            }
-        });
+        checkbox.checked = true;
     });
-});
+    showNotification('تم تحديد جميع الصلاحيات', 'success');
+}
 
-function applyDefaultPermissions() {
-    // Clear all checkboxes first
+function clearAllPermissions() {
     document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
         checkbox.checked = false;
     });
+    showNotification('تم إلغاء جميع الصلاحيات', 'info');
+}
+
+function applyDefaultPermissions() {
+    // Clear all checkboxes first
+    clearAllPermissions();
     
-    // Apply permissions based on the image:
+    // Apply permissions based on the default configuration:
     // الشركات: عرض الخاصة + عرض الكل
     setModulePermissions('suppliers', ['view_own', 'view_all']);
     
@@ -316,6 +310,8 @@ function applyDefaultPermissions() {
     
     // الوُسطاء: عرض الخاصة
     setModulePermissions('agents', ['view_own']);
+    
+    showNotification('تم تطبيق الصلاحيات الافتراضية بنجاح', 'success');
 }
 
 function setModulePermissions(module, actions) {
@@ -345,14 +341,50 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Form validation
-document.querySelector('form').addEventListener('submit', function(e) {
-    const checkedPermissions = document.querySelectorAll('.permission-checkbox:checked');
-    if (checkedPermissions.length === 0) {
-        e.preventDefault();
-        showNotification('يجب تحديد صلاحية واحدة على الأقل', 'warning');
-        return false;
-    }
+document.addEventListener('DOMContentLoaded', function() {
+    // Generate permission rows
+    document.getElementById('permissionsTableBody').innerHTML = generatePermissionRows();
+    
+    // Apply default permissions on load
+    applyDefaultPermissions();
+    
+    // Add change listeners to checkboxes for visual feedback
+    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const row = this.closest('tr');
+            if (this.checked) {
+                row.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+                setTimeout(() => {
+                    row.style.backgroundColor = '';
+                }, 500);
+            }
+        });
+    });
+    
+    // Form validation
+    document.getElementById('distributorForm').addEventListener('submit', function(e) {
+        const checkedPermissions = document.querySelectorAll('.permission-checkbox:checked');
+        if (checkedPermissions.length === 0) {
+            e.preventDefault();
+            showNotification('يجب تحديد صلاحية واحدة على الأقل', 'warning');
+            return false;
+        }
+        
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        
+        if (!username) {
+            e.preventDefault();
+            showNotification('اسم المستخدم مطلوب', 'warning');
+            return false;
+        }
+        
+        if (password.length < 6) {
+            e.preventDefault();
+            showNotification('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'warning');
+            return false;
+        }
+    });
 });
 </script>
 ` }) %>

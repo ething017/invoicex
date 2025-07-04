@@ -6,7 +6,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Default permissions for new distributors based on the image requirements
+// Helper function to get default distributor permissions
 const getDefaultDistributorPermissions = async () => {
   const defaultPermissionNames = [
     // الشركات: عرض الخاصة + عرض الكل
@@ -38,6 +38,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
       .sort({ createdAt: -1 });
     res.render('distributors/index', { distributors });
   } catch (error) {
+    console.error('Error loading distributors:', error);
     req.flash('error', 'حدث خطأ أثناء تحميل الموزعين');
     res.render('distributors/index', { distributors: [] });
   }
@@ -68,6 +69,7 @@ router.get('/new', requireAuth, requireAdmin, async (req, res) => {
       defaultPermissions: defaultPermissions.map(id => id.toString())
     });
   } catch (error) {
+    console.error('Error loading new distributor form:', error);
     req.flash('error', 'حدث خطأ أثناء تحميل البيانات');
     res.redirect('/distributors');
   }
@@ -77,6 +79,26 @@ router.get('/new', requireAuth, requireAdmin, async (req, res) => {
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { username, password, commissionRate, permissions } = req.body;
+    
+    // Validate required fields
+    if (!username || !password) {
+      req.flash('error', 'اسم المستخدم وكلمة المرور مطلوبان');
+      return res.redirect('/distributors/new');
+    }
+    
+    // Check if username already exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      req.flash('error', 'اسم المستخدم موجود بالفعل');
+      return res.redirect('/distributors/new');
+    }
+    
+    // Validate permissions
+    const selectedPermissions = Array.isArray(permissions) ? permissions : [permissions].filter(Boolean);
+    if (selectedPermissions.length === 0) {
+      req.flash('error', 'يجب تحديد صلاحية واحدة على الأقل');
+      return res.redirect('/distributors/new');
+    }
     
     // Create the distributor user
     const distributor = new User({
@@ -95,20 +117,20 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     
     await distributor.save();
     
-    // Create or get distributor role
-    let distributorRole = await Role.findOne({ name: 'distributor' });
+    // Create or update distributor role with selected permissions
+    let distributorRole = await Role.findOne({ name: `distributor_${username}` });
     if (!distributorRole) {
       distributorRole = new Role({
-        name: 'distributor',
-        displayName: 'موزع',
-        description: 'صلاحيات أساسية للموزعين',
-        isSystemRole: true,
-        permissions: Array.isArray(permissions) ? permissions : [permissions].filter(Boolean)
+        name: `distributor_${username}`,
+        displayName: `صلاحيات ${username}`,
+        description: 'صلاحيات مخصصة للموزع',
+        isSystemRole: false,
+        permissions: selectedPermissions,
+        createdBy: req.session.user.id
       });
       await distributorRole.save();
     } else {
-      // Update role permissions with selected permissions
-      distributorRole.permissions = Array.isArray(permissions) ? permissions : [permissions].filter(Boolean);
+      distributorRole.permissions = selectedPermissions;
       await distributorRole.save();
     }
     
@@ -169,6 +191,7 @@ router.get('/:id/edit', requireAuth, requireAdmin, async (req, res) => {
       userPermissions
     });
   } catch (error) {
+    console.error('Error loading distributor edit form:', error);
     req.flash('error', 'حدث خطأ أثناء تحميل بيانات الموزع');
     res.redirect('/distributors');
   }
@@ -185,6 +208,22 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
       return res.redirect('/distributors');
     }
     
+    // Check if username is taken by another user
+    if (username !== distributor.username) {
+      const existingUser = await User.findOne({ username, _id: { $ne: req.params.id } });
+      if (existingUser) {
+        req.flash('error', 'اسم المستخدم موجود بالفعل');
+        return res.redirect(`/distributors/${req.params.id}/edit`);
+      }
+    }
+    
+    // Validate permissions
+    const selectedPermissions = Array.isArray(permissions) ? permissions : [permissions].filter(Boolean);
+    if (selectedPermissions.length === 0) {
+      req.flash('error', 'يجب تحديد صلاحية واحدة على الأقل');
+      return res.redirect(`/distributors/${req.params.id}/edit`);
+    }
+    
     // Update basic distributor info
     const updateData = {
       username,
@@ -197,15 +236,18 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
     // Update role permissions
     if (distributor.roles && distributor.roles.length > 0) {
       const role = distributor.roles[0];
-      role.permissions = Array.isArray(permissions) ? permissions : [permissions].filter(Boolean);
-      await role.save();
+      if (!role.isSystemRole) {
+        role.permissions = selectedPermissions;
+        await role.save();
+      }
     } else {
       // Create new role if none exists
       const newRole = new Role({
         name: `distributor_${distributor.username}`,
         displayName: `صلاحيات ${distributor.username}`,
         description: 'صلاحيات مخصصة للموزع',
-        permissions: Array.isArray(permissions) ? permissions : [permissions].filter(Boolean)
+        permissions: selectedPermissions,
+        createdBy: req.session.user.id
       });
       await newRole.save();
       
@@ -225,7 +267,7 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
 // Delete distributor
 router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const distributor = await User.findById(req.params.id);
+    const distributor = await User.findById(req.params.id).populate('roles');
     if (!distributor) {
       req.flash('error', 'الموزع غير موجود');
       return res.redirect('/distributors');
@@ -233,10 +275,9 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
     
     // Delete associated custom roles (not system roles)
     if (distributor.roles) {
-      for (const roleId of distributor.roles) {
-        const role = await Role.findById(roleId);
-        if (role && !role.isSystemRole) {
-          await Role.findByIdAndDelete(roleId);
+      for (const role of distributor.roles) {
+        if (!role.isSystemRole) {
+          await Role.findByIdAndDelete(role._id);
         }
       }
     }
@@ -245,8 +286,25 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
     req.flash('success', 'تم حذف الموزع بنجاح');
     res.redirect('/distributors');
   } catch (error) {
+    console.error('Error deleting distributor:', error);
     req.flash('error', 'حدث خطأ أثناء حذف الموزع');
     res.redirect('/distributors');
+  }
+});
+
+// API endpoint to get permissions by module
+router.get('/api/permissions/:module', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { module } = req.params;
+    const permissions = await Permission.find({ 
+      module, 
+      isActive: true 
+    }).sort({ action: 1 });
+    
+    res.json(permissions);
+  } catch (error) {
+    console.error('Error fetching permissions:', error);
+    res.status(500).json({ error: 'حدث خطأ أثناء تحميل الصلاحيات' });
   }
 });
 
