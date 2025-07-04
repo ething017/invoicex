@@ -1,0 +1,166 @@
+<% const title = 'إدارة الأدوار'; %>
+<%- include('../layout', { title, body: `
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">إدارة الأدوار والصلاحيات</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group">
+            <a href="/roles/new" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                إضافة دور جديد
+            </a>
+            <a href="/permissions" class="btn btn-outline-secondary">
+                <i class="fas fa-key"></i>
+                إدارة الصلاحيات
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        ${roles && roles.length > 0 ? `
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>اسم الدور</th>
+                            <th>الاسم المعروض</th>
+                            <th>الوصف</th>
+                            <th>عدد الصلاحيات</th>
+                            <th>نوع الدور</th>
+                            <th>الحالة</th>
+                            <th>تم الإنشاء بواسطة</th>
+                            <th>تاريخ الإنشاء</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${roles.map(role => `
+                            <tr>
+                                <td><strong>${role.name}</strong></td>
+                                <td>${role.displayName}</td>
+                                <td>${role.description || 'لا يوجد وصف'}</td>
+                                <td><span class="badge bg-info">${role.permissions.length}</span></td>
+                                <td>
+                                    ${role.isSystemRole ? 
+                                        '<span class="badge bg-warning">دور النظام</span>' : 
+                                        '<span class="badge bg-primary">دور مخصص</span>'
+                                    }
+                                </td>
+                                <td>
+                                    ${role.isActive ? 
+                                        '<span class="badge bg-success">نشط</span>' : 
+                                        '<span class="badge bg-danger">غير نشط</span>'
+                                    }
+                                </td>
+                                <td>${role.createdBy?.username || 'النظام'}</td>
+                                <td>${new Date(role.createdAt).toLocaleDateString('ar-EG')}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="viewRolePermissions('${role._id}', '${role.displayName}')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        ${!role.isSystemRole ? `
+                                            <a href="/roles/${role._id}/edit" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form method="POST" action="/roles/${role._id}?_method=DELETE" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا الدور؟')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        ` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        ` : `
+            <div class="text-center py-5">
+                <i class="fas fa-user-shield fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا توجد أدوار حالياً</h5>
+                <p class="text-muted">ابدأ بإضافة دور جديد</p>
+                <a href="/roles/new" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    إضافة دور جديد
+                </a>
+            </div>
+        `}
+    </div>
+</div>
+
+<!-- Role Permissions Modal -->
+<div class="modal fade" id="rolePermissionsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">صلاحيات الدور: <span id="roleNameDisplay"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="rolePermissionsContent">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const rolesData = ${JSON.stringify(roles)};
+
+function viewRolePermissions(roleId, roleName) {
+    const role = rolesData.find(r => r._id === roleId);
+    if (!role) return;
+    
+    document.getElementById('roleNameDisplay').textContent = roleName;
+    
+    // Group permissions by module
+    const groupedPermissions = role.permissions.reduce((acc, permission) => {
+        if (!acc[permission.module]) {
+            acc[permission.module] = [];
+        }
+        acc[permission.module].push(permission);
+        return acc;
+    }, {});
+    
+    let content = '';
+    if (Object.keys(groupedPermissions).length === 0) {
+        content = '<p class="text-muted">لا توجد صلاحيات مُعيّنة لهذا الدور</p>';
+    } else {
+        Object.keys(groupedPermissions).forEach(module => {
+            const moduleNameMap = {
+                'companies': 'الشركات',
+                'clients': 'العملاء',
+                'files': 'الملفات',
+                'invoices': 'الفواتير',
+                'distributors': 'الموزعين',
+                'reports': 'التقارير',
+                'commission-tiers': 'مستويات العمولة',
+                'roles': 'الأدوار',
+                'permissions': 'الصلاحيات',
+                'system': 'النظام'
+            };
+            
+            content += \`
+                <div class="mb-3">
+                    <h6 class="text-primary">\${moduleNameMap[module] || module}</h6>
+                    <div class="row">
+                        \${groupedPermissions[module].map(permission => \`
+                            <div class="col-md-6 mb-2">
+                                <span class="badge bg-secondary">\${permission.displayName}</span>
+                            </div>
+                        \`).join('')}
+                    </div>
+                </div>
+            \`;
+        });
+    }
+    
+    document.getElementById('rolePermissionsContent').innerHTML = content;
+    
+    const modal = new bootstrap.Modal(document.getElementById('rolePermissionsModal'));
+    modal.show();
+}
+</script>
+` }) %>

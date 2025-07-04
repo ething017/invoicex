@@ -1,0 +1,186 @@
+<% const title = 'إضافة دور جديد'; %>
+<%- include('../layout', { title, body: `
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">إضافة دور جديد</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="/roles" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-right"></i>
+            العودة للأدوار
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">بيانات الدور</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/roles">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">اسم الدور (بالإنجليزية) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" required placeholder="manager">
+                            <div class="form-text">يُستخدم في النظام (بدون مسافات)</div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="displayName" class="form-label">الاسم المعروض <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="displayName" name="displayName" required placeholder="مدير">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">الوصف</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="وصف مختصر للدور وصلاحياته"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">الصلاحيات <span class="text-danger">*</span></label>
+                        <div class="permissions-container">
+                            ${Object.keys(groupedPermissions).map(module => {
+                                const moduleNameMap = {
+                                    'companies': 'الشركات',
+                                    'clients': 'العملاء', 
+                                    'files': 'الملفات',
+                                    'invoices': 'الفواتير',
+                                    'distributors': 'الموزعين',
+                                    'reports': 'التقارير',
+                                    'commission-tiers': 'مستويات العمولة',
+                                    'roles': 'الأدوار',
+                                    'permissions': 'الصلاحيات',
+                                    'system': 'النظام'
+                                };
+                                
+                                return `
+                                    <div class="card mb-3">
+                                        <div class="card-header">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">${moduleNameMap[module] || module}</h6>
+                                                <div>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllModule('${module}')">تحديد الكل</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllModule('${module}')">إلغاء الكل</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                ${groupedPermissions[module].map(permission => {
+                                                    const actionNameMap = {
+                                                        'create': 'إنشاء',
+                                                        'read': 'عرض',
+                                                        'update': 'تعديل',
+                                                        'delete': 'حذف',
+                                                        'read_all': 'عرض الكل',
+                                                        'read_own': 'عرض الخاصة',
+                                                        'manage': 'إدارة'
+                                                    };
+                                                    
+                                                    return `
+                                                        <div class="col-md-4 mb-2">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input module-${module}" type="checkbox" id="perm_${permission._id}" name="permissions" value="${permission._id}">
+                                                                <label class="form-check-label" for="perm_${permission._id}">
+                                                                    ${permission.displayName}
+                                                                    <small class="text-muted d-block">${actionNameMap[permission.action] || permission.action}</small>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    `;
+                                                }).join('')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            حفظ الدور
+                        </button>
+                        <a href="/roles" class="btn btn-outline-secondary">إلغاء</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">تعليمات</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-info-circle text-info"></i>
+                        اختر اسماً واضحاً للدور
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-shield-alt text-warning"></i>
+                        حدد الصلاحيات بعناية
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-users text-success"></i>
+                        يمكن تعيين الدور لعدة مستخدمين
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">أنواع الصلاحيات</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-12 mb-2">
+                        <span class="badge bg-success">إنشاء</span>
+                        <small class="text-muted">إضافة عناصر جديدة</small>
+                    </div>
+                    <div class="col-12 mb-2">
+                        <span class="badge bg-info">عرض</span>
+                        <small class="text-muted">مشاهدة البيانات</small>
+                    </div>
+                    <div class="col-12 mb-2">
+                        <span class="badge bg-warning">تعديل</span>
+                        <small class="text-muted">تحديث البيانات</small>
+                    </div>
+                    <div class="col-12 mb-2">
+                        <span class="badge bg-danger">حذف</span>
+                        <small class="text-muted">إزالة البيانات</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectAllModule(module) {
+    const checkboxes = document.querySelectorAll(\`.module-\${module}\`);
+    checkboxes.forEach(checkbox => checkbox.checked = true);
+}
+
+function deselectAllModule(module) {
+    const checkboxes = document.querySelectorAll(\`.module-\${module}\`);
+    checkboxes.forEach(checkbox => checkbox.checked = false);
+}
+
+// Auto-generate role name from display name
+document.getElementById('displayName').addEventListener('input', function() {
+    const displayName = this.value;
+    const roleName = displayName
+        .toLowerCase()
+        .replace(/[^a-zA-Z0-9\\u0600-\\u06FF]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    
+    document.getElementById('name').value = roleName;
+});
+</script>
+` }) %>

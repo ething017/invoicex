@@ -1,0 +1,370 @@
+<% const title = 'تعديل الموزع'; %>
+<%- include('../layout', { title, body: `
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">تعديل الموزع</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="/distributors" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-right"></i>
+            العودة للموزعين
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">بيانات الموزع</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/distributors/${distributor._id}?_method=PUT">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="username" class="form-label">اسم المستخدم <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="username" name="username" value="${distributor.username}" required>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="commissionRate" class="form-label">نسبة العمولة (%) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="commissionRate" name="commissionRate" min="0" max="100" step="0.01" value="${distributor.commissionRate}" required>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3 d-flex align-items-center">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="isActive" name="isActive" ${distributor.isActive ? 'checked' : ''}>
+                                <label class="form-check-label" for="isActive">
+                                    الحساب نشط
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">صلاحيات الموزع</label>
+                        <div class="permissions-table-container">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">تحديد الصلاحيات</h6>
+                                <div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="selectAllPermissions()">تحديد الكل</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="clearAllPermissions()">إلغاء الكل</button>
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="applyDefaultPermissions()">
+                                        تطبيق الافتراضي
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered permissions-table">
+                                    <thead class="table-primary">
+                                        <tr>
+                                            <th class="text-center module-header">المورد</th>
+                                            <th class="text-center action-header">عرض الخاصة</th>
+                                            <th class="text-center action-header">عرض الكل</th>
+                                            <th class="text-center action-header">إنشاء</th>
+                                            <th class="text-center action-header">تعديل</th>
+                                            <th class="text-center action-header">حذف</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${generatePermissionRows()}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            حفظ التعديلات
+                        </button>
+                        <a href="/distributors" class="btn btn-outline-secondary">إلغاء</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.permissions-table-container {
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.permissions-table {
+    font-size: 0.95rem;
+    margin-bottom: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.permissions-table thead th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: middle;
+    padding: 15px 10px;
+    border: none;
+    position: relative;
+}
+
+.permissions-table thead th.module-header {
+    background: linear-gradient(135deg, #4a5568 0%, #553c9a 100%) !important;
+    width: 200px;
+}
+
+.permissions-table tbody td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 12px 10px;
+    border: 1px solid #e9ecef;
+    background-color: #ffffff;
+    transition: all 0.3s ease;
+}
+
+.permissions-table tbody tr:hover td {
+    background-color: #f8f9fa;
+    transform: scale(1.01);
+}
+
+.permissions-table .module-name {
+    font-weight: 600;
+    color: #333;
+    text-align: right;
+    padding-right: 20px;
+    background: linear-gradient(135deg, #f1f3f4 0%, #ffffff 100%);
+    border-left: 4px solid #667eea;
+}
+
+.permissions-table input[type="checkbox"] {
+    transform: scale(1.3);
+    cursor: pointer;
+    accent-color: #667eea;
+    transition: all 0.2s ease;
+}
+
+.permissions-table input[type="checkbox"]:hover {
+    transform: scale(1.4);
+}
+
+.permissions-table input[type="checkbox"]:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+/* Dark mode styles */
+[data-theme="dark"] .permissions-table-container {
+    background: linear-gradient(135deg, #2d2d2d 0%, #1e1e1e 100%);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .permissions-table thead th {
+    background: linear-gradient(135deg, #4a5568 0%, #553c9a 100%) !important;
+}
+
+[data-theme="dark"] .permissions-table thead th.module-header {
+    background: linear-gradient(135deg, #2d3748 0%, #4c3085 100%) !important;
+}
+
+[data-theme="dark"] .permissions-table tbody td {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .permissions-table tbody tr:hover td {
+    background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .permissions-table .module-name {
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--card-bg) 100%);
+    color: var(--text-primary);
+    border-left-color: #4a5568;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .permissions-table-container {
+        padding: 15px;
+    }
+    
+    .permissions-table {
+        font-size: 0.85rem;
+    }
+    
+    .permissions-table thead th {
+        padding: 10px 5px;
+        font-size: 0.8rem;
+    }
+    
+    .permissions-table tbody td {
+        padding: 8px 5px;
+    }
+    
+    .permissions-table .module-name {
+        padding-right: 10px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Animation for checkbox changes */
+@keyframes checkboxPulse {
+    0% { transform: scale(1.3); }
+    50% { transform: scale(1.5); }
+    100% { transform: scale(1.3); }
+}
+
+.permissions-table input[type="checkbox"]:checked {
+    animation: checkboxPulse 0.3s ease;
+}
+</style>
+
+<script>
+const groupedPermissions = ${JSON.stringify(groupedPermissions)};
+const userPermissions = ${JSON.stringify(userPermissions)};
+
+function generatePermissionRows() {
+    const moduleOrder = ['suppliers', 'clients', 'files', 'orders', 'agents'];
+    const moduleNames = {
+        'suppliers': 'الشركات',
+        'clients': 'العملاء',
+        'files': 'الملفات',
+        'orders': 'الطلبات',
+        'agents': 'الوُسطاء'
+    };
+    
+    const actionOrder = ['view_own', 'view_all', 'create', 'update', 'delete'];
+    
+    let rows = '';
+    
+    moduleOrder.forEach(module => {
+        if (groupedPermissions[module]) {
+            rows += \`
+                <tr class="module-row" data-module="\${module}">
+                    <td class="module-name">\${moduleNames[module]}</td>
+            \`;
+            
+            actionOrder.forEach(action => {
+                const permission = groupedPermissions[module].find(p => p.action === action);
+                if (permission) {
+                    const isChecked = userPermissions.includes(permission._id.toString());
+                    rows += \`
+                        <td>
+                            <input type="checkbox" 
+                                   name="permissions" 
+                                   value="\${permission._id}" 
+                                   id="perm_\${permission._id}"
+                                   data-module="\${module}"
+                                   data-action="\${action}"
+                                   \${isChecked ? 'checked' : ''}
+                                   class="form-check-input permission-checkbox">
+                        </td>
+                    \`;
+                } else {
+                    rows += '<td class="text-muted">-</td>';
+                }
+            });
+            
+            rows += '</tr>';
+        }
+    });
+    
+    return rows;
+}
+
+function selectAllPermissions() {
+    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    showNotification('تم تحديد جميع الصلاحيات', 'success');
+}
+
+function clearAllPermissions() {
+    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    showNotification('تم إلغاء جميع الصلاحيات', 'info');
+}
+
+function applyDefaultPermissions() {
+    // Clear all checkboxes first
+    clearAllPermissions();
+    
+    // Apply permissions based on the image:
+    // الشركات: عرض الخاصة + عرض الكل
+    setModulePermissions('suppliers', ['view_own', 'view_all']);
+    
+    // العملاء: عرض الخاصة + إنشاء + تعديل + حذف
+    setModulePermissions('clients', ['view_own', 'create', 'update', 'delete']);
+    
+    // الملفات: عرض الخاصة + عرض الكل + إنشاء + تعديل + حذف
+    setModulePermissions('files', ['view_own', 'view_all', 'create', 'update', 'delete']);
+    
+    // الطلبات: عرض الخاصة + إنشاء + تعديل + حذف
+    setModulePermissions('orders', ['view_own', 'create', 'update', 'delete']);
+    
+    // الوُسطاء: عرض الخاصة
+    setModulePermissions('agents', ['view_own']);
+    
+    showNotification('تم تطبيق الصلاحيات الافتراضية بنجاح', 'success');
+}
+
+function setModulePermissions(module, actions) {
+    actions.forEach(action => {
+        const checkbox = document.querySelector(\`input[data-module="\${module}"][data-action="\${action}"]\`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    });
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = \`alert alert-\${type} alert-dismissible fade show position-fixed\`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = \`
+        \${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    \`;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add change listeners to checkboxes for visual feedback
+    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const row = this.closest('tr');
+            if (this.checked) {
+                row.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+                setTimeout(() => {
+                    row.style.backgroundColor = '';
+                }, 500);
+            }
+        });
+    });
+});
+
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const checkedPermissions = document.querySelectorAll('.permission-checkbox:checked');
+    if (checkedPermissions.length === 0) {
+        e.preventDefault();
+        showNotification('يجب تحديد صلاحية واحدة على الأقل', 'warning');
+        return false;
+    }
+});
+</script>
+` }) %>

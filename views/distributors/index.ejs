@@ -1,0 +1,167 @@
+<% const title = 'إدارة الموزعين'; %>
+<%- include('../layout', { title, body: `
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">إدارة الموزعين</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="/distributors/new" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            إضافة موزع جديد
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        ${distributors && distributors.length > 0 ? `
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>اسم المستخدم</th>
+                            <th>نسبة العمولة</th>
+                            <th>الأدوار</th>
+                            <th>عدد الصلاحيات</th>
+                            <th>الحالة</th>
+                            <th>تاريخ الإنشاء</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${distributors.map(distributor => {
+                            const totalPermissions = distributor.roles ? 
+                                distributor.roles.reduce((total, role) => total + (role.permissions ? role.permissions.length : 0), 0) : 0;
+                            
+                            return `
+                                <tr>
+                                    <td><strong>${distributor.username}</strong></td>
+                                    <td><span class="badge bg-info">%${distributor.commissionRate}</span></td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            ${distributor.roles ? distributor.roles.map(role => 
+                                                `<span class="badge bg-primary">${role.displayName}</span>`
+                                            ).join('') : '<span class="badge bg-secondary">لا يوجد</span>'}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">${totalPermissions}</span>
+                                    </td>
+                                    <td>
+                                        ${distributor.isActive ? 
+                                            '<span class="badge bg-success">نشط</span>' : 
+                                            '<span class="badge bg-danger">غير نشط</span>'
+                                        }
+                                    </td>
+                                    <td>${new Date(distributor.createdAt).toLocaleDateString('ar-EG')}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-outline-info" onclick="viewDistributorPermissions('${distributor._id}', '${distributor.username}')">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <a href="/distributors/${distributor._id}/edit" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        ` : `
+            <div class="text-center py-5">
+                <i class="fas fa-user-tie fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا توجد موزعين حالياً</h5>
+                <p class="text-muted">ابدأ بإضافة موزع جديد</p>
+                <a href="/distributors/new" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    إضافة موزع جديد
+                </a>
+            </div>
+        `}
+    </div>
+</div>
+
+<!-- Distributor Permissions Modal -->
+<div class="modal fade" id="distributorPermissionsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">صلاحيات الموزع: <span id="distributorNameDisplay"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="distributorPermissionsContent">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const distributorsData = ${JSON.stringify(distributors)};
+
+function viewDistributorPermissions(distributorId, distributorName) {
+    const distributor = distributorsData.find(d => d._id === distributorId);
+    if (!distributor || !distributor.roles) return;
+    
+    document.getElementById('distributorNameDisplay').textContent = distributorName;
+    
+    // Collect all permissions from all roles
+    const allPermissions = [];
+    distributor.roles.forEach(role => {
+        if (role.permissions) {
+            role.permissions.forEach(permission => {
+                allPermissions.push(permission);
+            });
+        }
+    });
+    
+    // Group permissions by module
+    const groupedPermissions = allPermissions.reduce((acc, permission) => {
+        if (!acc[permission.module]) {
+            acc[permission.module] = [];
+        }
+        acc[permission.module].push(permission);
+        return acc;
+    }, {});
+    
+    const moduleNameMap = {
+        'suppliers': 'الشركات',
+        'clients': 'العملاء',
+        'files': 'الملفات',
+        'orders': 'الطلبات',
+        'agents': 'الوُسطاء',
+        'reports': 'التقارير',
+        'commission-tiers': 'مستويات العمولة',
+        'roles': 'الأدوار',
+        'permissions': 'الصلاحيات',
+        'system': 'النظام'
+    };
+    
+    let content = '';
+    if (Object.keys(groupedPermissions).length === 0) {
+        content = '<p class="text-muted">لا توجد صلاحيات مُعيّنة لهذا الموزع</p>';
+    } else {
+        Object.keys(groupedPermissions).forEach(module => {
+            content += \`
+                <div class="mb-3">
+                    <h6 class="text-primary">\${moduleNameMap[module] || module}</h6>
+                    <div class="row">
+                        \${groupedPermissions[module].map(permission => \`
+                            <div class="col-md-6 mb-2">
+                                <span class="badge bg-secondary">\${permission.displayName}</span>
+                            </div>
+                        \`).join('')}
+                    </div>
+                </div>
+            \`;
+        });
+    }
+    
+    document.getElementById('distributorPermissionsContent').innerHTML = content;
+    
+    const modal = new bootstrap.Modal(document.getElementById('distributorPermissionsModal'));
+    modal.show();
+}
+</script>
+` }) %>
